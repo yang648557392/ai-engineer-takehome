@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environment
+.venv/
+
+# Build output
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Generated persistent data
+storage/

@@ -1,0 +1,51 @@
+From: platform-team@vantelgroup.example
+To: eng@pindroplabs.example
+Cc: platform-lead@vantelgroup.example
+Date: Tue, 5 Aug 2027 09:14:00 +0200
+Subject: Sensor transcript embeddings past retention window
+
+We sampled the pd-prod namespace this morning.
+Embeddings dated February 2027 are still present.
+That is well outside the window in the current retention policy.
+
+Can you put a nightly pruning job in place that deletes anything older than the policy window.
+
+--
+
+From: eng@pindroplabs.example
+To: platform-team@vantelgroup.example
+Date: Tue, 5 Aug 2027 14:02:00 +0200
+Subject: Re: Sensor transcript embeddings past retention window
+
+We do not think the policy applies here.
+Sensor telemetry is machine output, not customer data.
+Nobody's personal information is in a vibration reading.
+
+--
+
+From: platform-team@vantelgroup.example
+To: eng@pindroplabs.example
+Cc: platform-lead@vantelgroup.example
+Date: Wed, 6 Aug 2027 08:30:00 +0200
+Subject: Re: Sensor transcript embeddings past retention window
+
+The transcripts are not only telemetry.
+They include operator voice notes recorded on customer sites, which is why we treat them as derived from customer data.
+
+On volume, we estimate the pruning job removes roughly 1.1 million vectors on first run.
+That is most of the headroom problem solved on its own.
+
+Escalating to the platform lead for a decision so this does not sit.
+
+--
+
+From: platform-lead@vantelgroup.example
+To: eng@pindroplabs.example, platform-team@vantelgroup.example
+Date: Wed, 6 Aug 2027 17:45:00 +0200
+Subject: Re: Sensor transcript embeddings past retention window
+
+Noted, both positions are reasonable.
+I am not ruling on the telemetry question today.
+Build the pruning job now, we settle the classification separately.
+
+Ticket reference PLAT-4502, status in progress.

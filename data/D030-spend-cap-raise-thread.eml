@@ -1,0 +1,43 @@
+From: eng@orlo.example
+To: finance@vantelgroup.example
+Cc: platform-lead@vantelgroup.example
+Date: Mon, 21 Jul 2027 10:12:00 +0200
+Subject: Temporary spend cap raise for Orlo, July
+
+We are at 88% of the July cap with ten days to go, driven by the plant identification launch traffic.
+Requesting a temporary raise to EUR 1,800 for July only.
+
+--
+
+From: finance@vantelgroup.example
+To: eng@orlo.example
+Cc: platform-lead@vantelgroup.example
+Date: Mon, 21 Jul 2027 15:40:00 +0200
+Subject: Re: Temporary spend cap raise for Orlo, July
+
+Please send the written justification per the cap policy, including which routes are driving the spend.
+We will not raise a cap on a one line request.
+
+--
+
+From: eng@orlo.example
+To: finance@vantelgroup.example
+Cc: platform-lead@vantelgroup.example
+Date: Wed, 23 Jul 2027 09:05:00 +0200
+Subject: Re: Temporary spend cap raise for Orlo, July
+
+Justification attached.
+Most of the spend is on identification explanations, which run on a non critical route.
+
+--
+
+From: finance@vantelgroup.example
+To: eng@orlo.example
+Cc: platform-lead@vantelgroup.example
+Date: Fri, 25 Jul 2027 16:20:00 +0200
+Subject: Re: Temporary spend cap raise for Orlo, July
+
+Declined for July.
+The cap stands.
+If you hit 100%, only your critical route continues to be served, as per the gateway spec.
+Revisit the Q4 cap with a forecast in September.
