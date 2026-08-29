@@ -104,11 +104,7 @@ def load_document(path: Path) -> SourceDocument:
         raise ValueError(f"Invalid document ID {doc_id!r} in {path}")
 
     title_value = metadata.get("title")
-    title = (
-        str(title_value)
-        if title_value is not None
-        else _infer_title(path, content)
-    )
+    title = str(title_value) if title_value is not None else _infer_title(path, content)
 
     source_type_value = metadata.get("source_type")
     source_type = (
