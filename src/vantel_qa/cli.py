@@ -3,6 +3,7 @@ from rich.console import Console
 
 from vantel_qa.answerer import answer_question
 from vantel_qa.config import get_settings
+from vantel_qa.evaluation import run_evaluation
 from vantel_qa.indexer import build_index
 from vantel_qa.retriever import search_index
 
@@ -61,3 +62,21 @@ def ask_command(question: str) -> None:
         f"\nRetrieved: {', '.join(retrieved_ids)}",
         style="dim",
     )
+
+
+@app.command("evaluate")
+def evaluate_command() -> None:
+    """Run the golden evaluation set and save results."""
+
+    settings = get_settings()
+    summary = run_evaluation(settings)
+
+    console.rule("Evaluation summary")
+    console.print(f"Run ID: {summary.run_id}")
+    console.print(f"Passed: {summary.passed_count}/{summary.case_count}")
+    console.print(f"Correctness: {summary.correctness:.3f}")
+    console.print(f"Citation F1: {summary.citation_f1:.3f}")
+    console.print(f"Retrieval recall: {summary.retrieval_recall:.3f}")
+    console.print(f"Refusal pass rate: {summary.refusal_pass_rate:.3f}")
+    console.print(f"Aggregate score: {summary.aggregate_score:.3f}")
+    console.print(f"Database: {settings.evaluation_db_path.resolve()}")

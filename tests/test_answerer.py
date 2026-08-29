@@ -30,3 +30,13 @@ def test_extracts_unique_citations() -> None:
     )
 
     assert extract_citations(answer) == {"D002", "D003"}
+
+
+def test_extracts_grouped_citations() -> None:
+    answer = "The estimate uses multiple sources [D006; D008; D024]."
+
+    assert extract_citations(answer) == {
+        "D006",
+        "D008",
+        "D024",
+    }

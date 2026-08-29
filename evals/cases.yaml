@@ -1,0 +1,154 @@
+cases:
+  - id: q01
+    question: "What was Kettlebridge ARR at the end of Q2 2027?"
+    answerable: true
+    expected_answer: >
+      The board deck reported EUR 1,420,000, but group finance later
+      restated the value to EUR 1,280,000 and said the restatement
+      supersedes the board deck.
+    required_patterns:
+      - "1[,.]?420[,.]?000"
+      - "1[,.]?280[,.]?000"
+      - "supersed|restat"
+    expected_citations: [D002, D003]
+    relevant_documents: [D002, D003]
+
+  - id: q02
+    question: >
+      How quickly must a customer deletion request be executed,
+      and what happens to embeddings derived from that customer's data?
+    answerable: true
+    expected_answer: >
+      The request must be executed within two working days, and deletion
+      must cascade to derived embeddings within the same window.
+    required_patterns:
+      - "2 working days|two working days"
+      - "derived.*embeddings|embeddings.*derived"
+      - "same window|within.*2 working days"
+    expected_citations: [D005]
+    relevant_documents: [D004, D005]
+
+  - id: q03
+    question: >
+      Why does Orlo not have a namespace on the shared vector cluster,
+      and what has to happen before it can get one?
+    answerable: true
+    expected_answer: >
+      Orlo handles photographs that may contain identifiable people and
+      lacks the required DPO sign-off. It must submit the requested data
+      protection impact assessment, receive DPO sign-off, and wait for
+      the Pindrop pruning job to land before the namespace is reconsidered.
+    required_patterns:
+      - "identifiable people|people in the background"
+      - "DPO sign.?off"
+      - "data protection impact assessment|DPIA"
+      - "Pindrop.*pruning"
+    expected_citations: [D007, D023]
+    relevant_documents: [D006, D007, D023, D029]
+
+  - id: q04
+    question: >
+      If a venture hits 100% of its monthly agent gateway spend cap,
+      which requests still get served? Answer for every venture.
+    answerable: true
+    expected_answer: >
+      Only critical routes continue. Kettlebridge retains agent-tools and
+      classify-cheap; Orlo retains classify-cheap; Pindrop Labs retains
+      summarise-long; Marrow & Co has no critical route, so none continue.
+    required_patterns:
+      - "Kettlebridge"
+      - "agent-tools"
+      - "classify-cheap"
+      - "Orlo"
+      - "Pindrop Labs"
+      - "summarise-long"
+      - "Marrow & Co"
+      - "none|no critical"
+    expected_citations: [D009, D010]
+    relevant_documents: [D009, D010, D020]
+
+  - id: q05
+    question: "What is Orlo's monthly user churn rate?"
+    answerable: false
+    expected_answer: >
+      The corpus does not provide Orlo's monthly user churn rate.
+      It only provides Day 1, Day 7, and Day 30 retention figures,
+      which are not equivalent to monthly churn.
+    required_patterns: []
+    expected_citations: []
+    relevant_documents: [D022]
+
+  - id: q06
+    question: >
+      What is the retention window for embeddings derived from customer data?
+    answerable: true
+    expected_answer: >
+      The current v2 policy sets the window at 90 days. Version 1 previously
+      said 180 days but was superseded, while the 365-day v0 document was a
+      draft that was never adopted.
+    required_patterns:
+      - "90 days"
+      - "180 days"
+      - "365 days"
+      - "supersed"
+      - "draft|never adopted"
+    expected_citations: [D004, D005, D019]
+    relevant_documents: [D004, D005, D019]
+
+  - id: q07
+    question: >
+      If the Pindrop pruning job lands and delivers the expected reduction,
+      roughly how many vectors will the shared cluster hold?
+    answerable: true
+    expected_answer: >
+      Using the March total of 3.1 million vectors and the dry-run reduction
+      of 1.08 million gives roughly 2.02 million vectors. The baseline is
+      an older March measurement, so this is only an estimate.
+    required_patterns:
+      - '3[.,]1\s*(million|m)\b|3[,.]?100[,.]?000'
+      - '1[.,]0?8(?:\s*[–-]\s*1[.,]1)?\s*(million|m)\b|1[,.]?080[,.]?000'
+      - '(roughly|about)\s+2(?:[.,]0)?(?:\s*[–-]\s*2[.,]02)?\s*(million|m)\b|2[,.]?020[,.]?000'
+      - "March|older|estimate|based on the cited figures"
+    expected_citations: [D006, D024]
+    relevant_documents: [D006, D008, D024]
+
+  - id: q08
+    question: >
+      What is Marrow & Co's correct Q3 monthly gateway cap,
+      and why did the July incident treat it as EUR 1,400?
+    answerable: true
+    expected_answer: >
+      The correct Q3 cap is EUR 800. The gateway mistakenly left the
+      EUR 600 Q2 sheet active and summed both sheets to EUR 1,400.
+    required_patterns:
+      - "800"
+      - "600"
+      - "1[,.]?400"
+      - "summed|both.*sheet"
+    expected_citations: [D010, D020, D025]
+    relevant_documents: [D010, D020, D025]
+
+  - id: q09
+    question: >
+      Which Marrow & Co client forbids generative images,
+      and is LLM-assisted text drafting allowed?
+    answerable: true
+    expected_answer: >
+      Halden Bikes forbids generative image tools for shipped work.
+      LLM-assisted text drafting is allowed if a human edits and signs off.
+    required_patterns:
+      - "Halden Bikes"
+      - "generative image"
+      - "text drafting"
+      - "human.*edits|human.*signs off"
+    expected_citations: [D013]
+    relevant_documents: [D013, D027]
+
+  - id: q10
+    question: "What revenue did Orlo report for July 2027?"
+    answerable: false
+    expected_answer: >
+      The corpus does not provide an Orlo revenue figure for July 2027.
+    required_patterns: []
+    expected_citations: []
+    relevant_documents: [D022]

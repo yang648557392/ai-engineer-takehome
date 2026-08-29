@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     chroma_collection: str = "vantel-documents"
     data_path: Path = Path("data")
     chat_model: str = "openai/gpt-5-mini"
+    evaluation_cases_path: Path = Path("evals/cases.yaml")
+    evaluation_db_path: Path = Path("storage/evaluations.sqlite")
 
 
 @lru_cache
