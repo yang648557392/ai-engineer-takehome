@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     chroma_path: Path = Path("storage/chroma")
     chroma_collection: str = "vantel-documents"
     data_path: Path = Path("data")
+    chat_model: str = "openai/gpt-5-mini"
 
 
 @lru_cache

@@ -65,3 +65,17 @@ class DocumentChunk:
             result["section"] = self.section
 
         return result
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievedChunk:
+    """One chunk returned by retrieval."""
+
+    chunk_id: str
+    doc_id: str
+    title: str
+    content: str
+    score: float
+    position: int
+    date: str | None = None
+    section: str | None = None
