@@ -1,7 +1,7 @@
 [project]
 name = "vantel-qa"
 version = "0.1.0"
-description = "Add your description here"
+description = "Cited question answering and evaluation over the Vantel corpus"
 readme = "README.md"
 authors = [
     { name = "yangmingzhe", email = "yang13930079212@gmail.com" }
@@ -13,7 +13,6 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     "python-dotenv>=1.2.3",
     "pyyaml>=6.0.3",
-    "rank-bm25>=0.2.2",
     "rich>=15.0.0",
     "typer>=0.27.2",
 ]
