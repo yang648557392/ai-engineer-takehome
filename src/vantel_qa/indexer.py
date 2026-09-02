@@ -83,9 +83,6 @@ def index_chunks(
     }
 
     if reset and collection_name in existing_names:
-        # Full replacement removes chunks for source files that disappeared.
-        # Chroma may leave an old HNSW folder on disk, but it is no longer
-        # referenced by the active collection.
         chroma_client.delete_collection(collection_name)
 
     collection = chroma_client.get_or_create_collection(
@@ -98,8 +95,7 @@ def index_chunks(
         },
     )
 
-    # These four lists are positional: item N in every list describes the same
-    # chunk. Stable chunk IDs update rather than duplicate when reset=False.
+
     collection.upsert(
         ids=[chunk.chunk_id for chunk in chunks],
         embeddings=vectors,

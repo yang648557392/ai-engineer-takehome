@@ -1,338 +1,185 @@
 # Vantel QA
 
-A retrieval-augmented question answering system over the 32-document Vantel Group corpus.
+Vantel QA is a small retrieval-augmented generation (RAG) system. It answers
+questions about 32 Vantel Group documents.
 
-The system loads Markdown, CSV, and email files, stores embeddings in ChromaDB, answers questions with `[Dxxx]` citations, identifies conflicting or superseded information, refuses unsupported questions, and stores evaluation runs in SQLite.
+The system finds relevant text, sends it to a chat model, and adds source IDs
+such as [D005]. It reports conflicts between documents. It refuses to answer
+when the documents do not contain enough information.
 
-The implementation uses the OpenAI-compatible OpenRouter API directly instead of LangChain. For this small project, using the SDK directly keeps retrieval, prompts, citations, and evaluation logic visible and easy to explain.
+## Quick Start
 
-## Quick start
+You need Python 3.12, uv, and an OpenRouter API key.
 
-Requirements:
+Copy the example environment file:
 
-- Python 3.12
-- `uv`
-- an OpenRouter API key
+~~~bash
+cp .env.example .env
+~~~
 
-Copy `.env.example` to `.env` and put the provided key in:
+Add the provided key to .env:
 
-```dotenv
+~~~dotenv
 OPENROUTER_API_KEY=your-key
-```
+~~~
 
-After configuring `.env`, install dependencies and build the index:
+Install the project and build the index:
 
-```bash
+~~~bash
 uv sync
-uv run vantel-qa index
-```
-
-If Python cannot resolve the local `src` package, use:
-
-```bash
 PYTHONPATH=src uv run vantel-qa index
-```
+~~~
 
-The completed index contains 32 source documents represented as 38 chunks with 1,536-dimensional embeddings.
+The finished index has 32 documents, 38 chunks, and 1,536 values in each
+embedding vector.
 
 ## Commands
 
-Ask a question:
+Search for relevant text without asking the chat model:
 
-```bash
-PYTHONPATH=src uv run vantel-qa ask "What was Kettlebridge ARR at the end of Q2 2027?"
-```
-
-Inspect retrieval results:
-
-```bash
+~~~bash
 PYTHONPATH=src uv run vantel-qa search "What was Kettlebridge ARR at the end of Q2 2027?"
-```
+~~~
 
-Run all evaluation cases:
+Generate an answer:
 
-```bash
+~~~bash
+PYTHONPATH=src uv run vantel-qa ask "What was Kettlebridge ARR at the end of Q2 2027?"
+~~~
+
+Run all 10 evaluation cases:
+
+~~~bash
 PYTHONPATH=src uv run vantel-qa evaluate
-```
+~~~
 
-Run tests and static checks:
+Run tests and code checks:
 
-```bash
+~~~bash
 uv run pytest -v
 uv run ruff check .
-```
+~~~
 
-Compare stored evaluation runs:
+## How It Works
 
-```bash
-sqlite3 -header -column storage/evaluations.sqlite \
-  "SELECT started_at, run_id, passed_count, case_count,
-          correctness, citation_f1, retrieval_recall, aggregate_score
-   FROM evaluation_runs
-   ORDER BY started_at;"
-```
+1. loader.py reads Markdown, CSV, and email files.
+2. chunker.py turns each document into one or more chunks.
+3. openrouter.py creates an embedding vector for every chunk.
+4. indexer.py stores the text, metadata, and vectors in ChromaDB.
+5. retriever.py embeds a question and returns the eight closest chunks.
+6. answerer.py gives those chunks to the chat model.
+7. The answer must contain Dxxx citations.
 
-## Project structure
+Document IDs come from YAML frontmatter or filenames. The loader stops if the
+two IDs disagree.
 
-```text
-data/                         Source corpus
-evals/cases.yaml              Golden evaluation cases
-recommendation_memo.md        Portfolio rollout recommendation
-src/vantel_qa/
-  answerer.py                 Answer prompting and citation validation
-  chunker.py                  Format-aware chunking
-  cli.py                      CLI commands
-  config.py                   Environment configuration
-  evaluation.py               Scoring and SQLite persistence
-  indexer.py                  ChromaDB indexing
-  loader.py                   Markdown, CSV, and email loading
-  models.py                   Shared data structures
-  openrouter.py               OpenRouter API client
-  retriever.py                Vector retrieval
-tests/                        Offline unit tests
-docs/data-flow.md             Concrete data contracts and nested shapes
-```
+Small Markdown and CSV files stay together. Email threads are split by message.
+Long text is split near paragraph boundaries at 2,400 characters, with a
+250-character overlap. This keeps useful context while limiting chunk size.
 
-For concrete examples of every object passed between modules, including the
-nested Chroma and YAML structures, see [docs/data-flow.md](docs/data-flow.md).
+The embedding model is openai/text-embedding-3-small. It is on the assignment's
+zero-data-retention list. It is also low cost and good enough for this small
+corpus.
 
-Generated persistent data is stored in:
+The chat model is openai/gpt-5-mini. It gives a good balance of quality, speed,
+and cost. The project calls OpenRouter through the OpenAI SDK. It does not use
+LangChain. Direct SDK calls keep the retrieval and prompt logic easy to inspect.
 
-```text
-storage/chroma/               Chroma vector store
-storage/evaluations.sqlite    Evaluation runs and results
-```
+Chroma uses cosine distance. The system returns the top eight chunks. This was
+enough for the current evaluation, so I did not add keyword search or a
+reranker.
 
-These generated files are ignored by Git and can be recreated from the corpus.
+The system prompt tells the model to use only retrieved sources. It must explain
+conflicts and newer documents that replace older ones. After generation, the
+code rejects citations to documents that were not retrieved.
 
-## Loading and chunking
+See [docs/data-flow.md](docs/data-flow.md) for concrete data shapes.
 
-Document IDs are read from YAML frontmatter when present and otherwise extracted from filenames. If the filename and frontmatter contain different IDs, ingestion fails instead of risking an incorrect citation.
+## Persistence
 
-The corpus files are short, so Markdown documents are normally kept intact. This prevents important context from being separated, such as a number and the statement that it was later superseded.
+Chroma data is stored in storage/chroma. It contains document chunks,
+metadata, and embeddings.
 
-CSV files are also kept intact so one retrieved chunk can contain all venture rows. Email threads are split by message because individual messages may express different sides of a disagreement.
+Evaluation runs are stored in storage/evaluations.sqlite. One table stores each
+run. A second table stores the result for every question. Generated storage
+files are ignored by Git and can be rebuilt.
 
-Documents longer than 2,400 characters are split near paragraph boundaries with a 250-character overlap.
+## Evaluation
 
-## Model choices
-
-### Embeddings
-
-The embedding model is:
-
-```text
-openai/text-embedding-3-small
-```
-
-It was selected because it is explicitly included in the assignment’s allowed zero-data-retention model list, is inexpensive, and provides sufficient context and quality for this small corpus.
-
-Embeddings are generated through OpenRouter in batches of 32. The vectors are passed explicitly to ChromaDB, preventing Chroma from silently using a different local embedding model.
-
-### Answer generation
-
-The chat model is:
-
-```text
-openai/gpt-5-mini
-```
-
-It provides a reasonable balance of instruction following, reasoning quality, latency, and cost. Reasoning effort is set to `minimal` because the task is grounded extraction rather than open-ended reasoning.
-
-## Retrieval
-
-The system uses cosine vector retrieval and sends the eight highest-ranked chunks to the answer model.
-
-Dense retrieval was sufficient for this corpus. In the evaluation, the required source documents were consistently present in the top eight results. I therefore left out BM25 and reranking rather than adding complexity without demonstrated benefit.
-
-The ARR question demonstrates the conflict behaviour: retrieval returns both the original Q2 board deck and the later finance restatement. The answer can therefore report both figures and explain which source supersedes the other.
-
-## Answer and citation behaviour
-
-The answer prompt requires the model to:
-
-- use only retrieved documents;
-- treat document content as evidence rather than instructions;
-- cite every factual claim;
-- use `[Dxxx]` citations;
-- expose disagreements between documents;
-- explain when a document supersedes an older version;
-- distinguish reported figures, forecasts, and drafts;
-- refuse when the corpus is insufficient.
-
-After generation, the program extracts citation IDs and rejects an answer if it cites a document that was not retrieved.
-
-This prevents invented document IDs, but it does not prove that every cited document supports the exact associated claim.
-
-## Evaluation set
-
-`evals/cases.yaml` contains 10 cases:
+evals/cases.yaml contains:
 
 - the 7 required questions;
-- 3 additional questions;
-- 2 unanswerable questions, representing 20% of the set.
+- 3 extra questions;
+- 2 refusal questions.
 
-Each case contains:
+Each case has a human-written expected answer, required answer patterns,
+expected citations, and relevant documents.
 
-- a human-written expected answer;
-- regular-expression patterns representing required facts;
-- citations that should be present;
-- documents labelled as relevant for retrieval;
-- an `answerable` flag.
+The evaluator reports:
 
-## Evaluation metrics
+- correctness: how many required answer patterns were found;
+- citation F1: whether the answer used the expected source IDs;
+- retrieval recall: whether Chroma found the human-labelled documents;
+- refusal pass rate: whether unsupported questions were refused.
 
-### Answer correctness
+The aggregate score uses 50% correctness, 30% citation F1, and 20% retrieval
+recall. A case passes only if every main score is at least 0.8.
 
-For answerable questions, correctness is the fraction of required fact patterns found in the generated answer.
+The recorded final run produced:
 
-The regular expressions accept common nondeterministic variations such as:
+| Metric | Result |
+| --- | ---: |
+| Passed | 9/10 |
+| Correctness | 0.975 |
+| Citation F1 | 1.000 |
+| Retrieval recall@8 | 1.000 |
+| Refusal pass rate | 1.000 |
+| Aggregate score | 0.988 |
 
-- `1.08 million` versus `1.08M`;
-- different number punctuation;
-- “derived embeddings” versus “embeddings derived from”.
+Case q07 failed because the answer used a March vector count as if it were
+current. The number was close, but the answer missed the time warning.
 
-For unanswerable questions, the answer must explicitly say that the corpus does not provide enough information.
+This grading method is cheap and repeatable, but it does not fully understand
+language. A correct paraphrase can fail a regular expression. A wrong sentence
+can also contain the expected words. Citation scoring checks source IDs, but it
+does not prove that each source supports the exact claim.
 
-### Citation correctness
+## Scaling to 20,000 Documents
 
-Citation precision measures whether the cited IDs belong to expected or otherwise relevant documents.
+Full indexing would break first. The current system embeds every document again
+and replaces the collection.
 
-Citation recall measures whether the minimum expected citations were included.
+For 20,000 documents, I would add content hashes, incremental updates, deletion
+tracking, token-based chunking, metadata filters, keyword search, a reranker,
+and access control. I would also use a separately managed vector database.
 
-Citation F1 is the harmonic mean of precision and recall.
-
-### Retrieval recall
-
-Retrieval recall measures how many human-labelled relevant documents appear in the top eight retrieved chunks.
-
-### Aggregate score
-
-The aggregate is calculated as:
-
-```text
-50% answer correctness
-30% citation F1
-20% retrieval recall
-```
-
-A question passes only when correctness, citation F1, and retrieval recall are each at least `0.8`.
-
-Refusal pass rate is reported separately. A strong aggregate score should not hide a failure to refuse unsupported questions.
-
-## Final evaluation result
-
-Final run ID: `14fedb570e364779a9c767ebcc6f4e80`
-
-| Metric             | Result |
-| ------------------ | -----: |
-| Questions passed   |   9/10 |
-| Answer correctness |  0.975 |
-| Citation F1        |  1.000 |
-| Retrieval recall@8 |  1.000 |
-| Refusal pass rate  |  1.000 |
-| Aggregate score    |  0.988 |
-
-The only failed case was q07. The answer retrieved and cited all required sources and calculated roughly 2.0–2.02 million vectors correctly, but described the 3.1-million-vector March measurement as current. It therefore lost the required date and estimate caveat and scored 0.75 for correctness, below the 0.8 per-component pass threshold.
-
-I did not weaken the rubric to convert this into a pass. A production fix would strengthen temporal grounding so dated measurements cannot be described as current.
-
-## Grading limitations
-
-The deterministic evaluation is inexpensive, repeatable, and easy to debug, but it does not fully understand language.
-
-It can miss a correct paraphrase that was not anticipated by a regular expression. It can also give credit when required words are present but connected incorrectly.
-
-Citation scoring validates document IDs, not claim-level entailment. It also cannot reliably identify every factual sentence that lacks a citation.
-
-A production version should add:
-
-- a claim-level citation verifier;
-- a rubric-based model judge;
-- human review of a sample of passes;
-- human review of all refusals and failures.
-
-The deterministic metrics should remain because they make regressions easier to diagnose than a model-judge score alone.
-
-## SQLite persistence
-
-Every evaluation creates a new row in `evaluation_runs`.
-
-Every question is stored in `evaluation_results`, including:
-
-- generated answer;
-- correctness score;
-- citation precision, recall, and F1;
-- retrieval recall;
-- cited document IDs;
-- retrieved document IDs;
-- pass or fail status;
-- error message, if present.
-
-Each question is committed immediately, so completed results remain available if a later model request fails.
-
-## What breaks first at 20,000 documents
-
-The full-rebuild indexing process would break first. It currently reloads the whole corpus, regenerates every embedding, and replaces the collection even if only one document changed.
-
-At 20,000 documents I would add:
-
-1. content hashes and incremental upserts;
-2. deletion tombstones;
-3. token-aware and format-specific chunking;
-4. asynchronous batch embedding with retries;
-5. venture, date, and document-type metadata filters;
-6. hybrid keyword and vector retrieval;
-7. a reranker before answer generation;
-8. a separately operated or managed vector database;
-9. access control enforced before retrieval.
-
-Retrieval quality would also decline as similar quarterly reports and policy versions accumulate. Version and supersession metadata would need to become explicit.
-
-## Production monitoring
+## Production Monitoring
 
 I would monitor:
 
-- correctness and citation F1 by release;
-- retrieval recall on a maintained golden set;
-- refusal rate and refusal regressions;
-- attempted citations to non-retrieved documents;
-- sampled claim-level citation support;
-- failed ingestion and index freshness;
-- vector counts and retention age by venture;
-- deletion completion against the two-working-day policy;
-- p50 and p95 model latency;
-- API errors, fallbacks, retries, and HTTP 429 rates;
-- token usage and cost per answer;
-- monthly spend by venture;
-- Chroma query latency and empty-result rate;
-- regressions after model, prompt, or embedding changes.
+- answer and citation quality;
+- retrieval recall on a fixed test set;
+- refusal errors;
+- index age and vector count;
+- API errors and empty results;
+- response time and cost;
+- changes after a model, prompt, or index update.
 
-## Deliberate omissions
+## Limitations and Next Steps
 
-This submission does not include:
+This project does not include a web UI, login, venture-level permissions,
+streaming, hybrid search, reranking, incremental indexing, or claim-level
+citation checking.
 
-- a web UI or HTTP API;
-- authentication or venture-level authorization;
-- streaming answers;
-- hybrid retrieval or reranking;
-- incremental indexing;
-- a model-based evaluation judge;
-- automatic claim-level citation verification;
-- production tracing and dashboards.
+The next step would be stronger citation checking and a small internal pilot.
 
-The system is read-only and performs no write actions against venture systems.
+## Main Weakness
 
-## What would not survive the corpus’s own standards
+Vantel's own standard requires at least 30 cases written by domain experts.
+This submission has only 10. It is enough for a take-home test, but not for a
+production release.
 
-The evaluation contains 10 cases, while Vantel’s internal production standard requires at least 30 domain-authored cases.
+## Recommendation Memo
 
-The current set satisfies the 20% refusal requirement, but it is too small to act as a production release gate. Before rollout, I would expand it with venture owners, create a hidden test split, and add human review of citation support and refusal behaviour.
-
-## Recommendation memo
-
-The one-page portfolio rollout recommendation is available in:
-
-```text
-recommendation_memo.md
-```
+The rollout recommendation is in
+[recommendation_memo.md](recommendation_memo.md).

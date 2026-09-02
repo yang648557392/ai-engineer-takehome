@@ -103,8 +103,6 @@ def answer_question(
         ],
     )
 
-    # The API returns candidate completions as a list. This request asks for one
-    # candidate, so choices[0] is the answer to validate.
     answer = response.choices[0].message.content
 
     if not answer:
@@ -113,8 +111,6 @@ def answer_question(
     answer = answer.strip()
     used_citations = extract_citations(answer)
     allowed_citations = {chunk.doc_id for chunk in retrieved}
-    # This validates provenance, not semantic support. A separate claim-level
-    # verifier would be needed to prove that a cited source supports a sentence.
     invalid_citations = used_citations - allowed_citations
 
     if invalid_citations:
