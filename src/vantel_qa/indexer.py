@@ -1,3 +1,5 @@
+"""Build and persist the Chroma vector index from the source corpus."""
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -16,7 +18,11 @@ EmbeddingCallable = Callable[[list[str]], list[list[float]]]
 
 @dataclass(frozen=True, slots=True)
 class IndexStats:
-    """Summary of one indexing operation."""
+    """Counts reported to the CLI after one indexing operation.
+
+    stored_count comes back from Chroma; the other values describe the loaded
+    documents, generated chunks, and embedding shape.
+    """
 
     document_count: int
     chunk_count: int
@@ -33,7 +39,23 @@ def index_chunks(
     *,
     reset: bool = True,
 ) -> IndexStats:
-    """Embed chunks and persist them in ChromaDB."""
+    """Embed prepared chunks and store aligned records in ChromaDB.
+
+    Args:
+        chunks: Ordered retrieval units to index.
+        persist_path: Directory containing Chroma SQLite and HNSW files.
+        collection_name: Logical Chroma collection name.
+        embedding_model: Model name saved as collection metadata.
+        embedder: Callable mapping a string list to equally ordered vectors.
+        reset: Delete and recreate an existing collection before writing.
+
+    Returns:
+        Counts and vector dimensions for the completed operation.
+
+    Raises:
+        ValueError: If no chunks were provided.
+        RuntimeError: If vector count or dimensions are inconsistent.
+    """
 
     if not chunks:
         raise ValueError("Cannot build an index without chunks")
@@ -61,6 +83,9 @@ def index_chunks(
     }
 
     if reset and collection_name in existing_names:
+        # Full replacement removes chunks for source files that disappeared.
+        # Chroma may leave an old HNSW folder on disk, but it is no longer
+        # referenced by the active collection.
         chroma_client.delete_collection(collection_name)
 
     collection = chroma_client.get_or_create_collection(
@@ -73,6 +98,8 @@ def index_chunks(
         },
     )
 
+    # These four lists are positional: item N in every list describes the same
+    # chunk. Stable chunk IDs update rather than duplicate when reset=False.
     collection.upsert(
         ids=[chunk.chunk_id for chunk in chunks],
         embeddings=vectors,
@@ -93,7 +120,11 @@ def build_index(
     *,
     reset: bool = True,
 ) -> IndexStats:
-    """Load the corpus, create embeddings, and build the index."""
+    """Run the complete offline indexing pipeline.
+
+    Data flows through loading, chunking, OpenRouter embeddings, and Chroma
+    persistence. This is the service-layer entry used by the index command.
+    """
 
     documents = load_documents(settings.data_path)
     chunks = chunk_documents(documents)

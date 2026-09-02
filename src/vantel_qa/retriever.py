@@ -1,3 +1,5 @@
+"""Turn a question into a vector and reconstruct typed Chroma matches."""
+
 from collections.abc import Callable
 
 import chromadb
@@ -16,7 +18,21 @@ def search_collection(
     embedder: QueryEmbedder,
     top_k: int = 8,
 ) -> list[RetrievedChunk]:
-    """Search one Chroma collection using a question embedding."""
+    """Return the most similar chunks from an opened Chroma collection.
+
+    Args:
+        collection: Collection containing indexed document chunks.
+        question: One non-empty natural-language question.
+        embedder: Callable returning one vector for each input string.
+        top_k: Maximum results, capped at the collection size.
+
+    Returns:
+        RetrievedChunk objects ordered from nearest to farthest.
+
+    Raises:
+        ValueError: If the question is blank or top_k is not positive.
+        RuntimeError: If the collection or API response is inconsistent.
+    """
 
     if not question.strip():
         raise ValueError("Question cannot be empty")
@@ -40,6 +56,9 @@ def search_collection(
         include=["documents", "metadatas", "distances"],
     )
 
+    # Chroma supports batched queries, so every field is shaped as
+    # [query][match]. We sent one question and select outer index 0 before
+    # zipping the parallel match fields.
     ids = result["ids"][0]
     documents = result["documents"][0] if result["documents"] else []
     metadatas = result["metadatas"][0] if result["metadatas"] else []
@@ -57,6 +76,8 @@ def search_collection(
         distances,
         strict=True,
     ):
+        # Cosine distance is smaller for better matches. Convert it to a
+        # larger-is-better score for display.
         retrieved.append(
             RetrievedChunk(
                 chunk_id=chunk_id,
@@ -78,7 +99,11 @@ def search_index(
     question: str,
     top_k: int = 8,
 ) -> list[RetrievedChunk]:
-    """Search the persistent project index."""
+    """Open the configured index and retrieve evidence for one question.
+
+    This wrapper owns infrastructure setup. search_collection contains the
+    testable retrieval logic and accepts an injected embedder.
+    """
 
     chroma_client = chromadb.PersistentClient(path=str(settings.chroma_path))
     collection = chroma_client.get_collection(

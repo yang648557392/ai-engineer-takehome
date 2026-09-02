@@ -1,10 +1,16 @@
+"""Small OpenRouter adapter for chat and embedding API access."""
+
 from openai import OpenAI
 
 from vantel_qa.config import Settings
 
 
 def create_openrouter_client(settings: Settings) -> OpenAI:
-    """Create an OpenAI-compatible client pointed at OpenRouter."""
+    """Create an OpenAI SDK client configured for OpenRouter.
+
+    OpenRouter implements an OpenAI-compatible API, so the standard OpenAI
+    client can be reused with a different base URL and API key.
+    """
 
     return OpenAI(
         base_url=settings.openrouter_base_url,
@@ -21,7 +27,22 @@ def embed_texts(
     model: str,
     batch_size: int = 32,
 ) -> list[list[float]]:
-    """Generate embeddings while preserving input order."""
+    """Embed text in batches while preserving caller-visible order.
+
+    Args:
+        client: Configured OpenAI-compatible client.
+        texts: Input strings. One embedding vector is returned per string.
+        model: OpenRouter embedding model identifier.
+        batch_size: Maximum number of texts sent in one API request.
+
+    Returns:
+        A two-dimensional list shaped as [number of texts][vector dimensions].
+        With this project model, 38 chunk inputs produce a 38 by 1536 result.
+
+    Raises:
+        ValueError: If batch_size is not positive.
+        RuntimeError: If the API returns a different number of vectors.
+    """
 
     if batch_size <= 0:
         raise ValueError("batch_size must be positive")
@@ -40,6 +61,8 @@ def embed_texts(
             encoding_format="float",
         )
 
+        # API items include their original input index. Sort explicitly so
+        # vector N remains aligned with text N before Chroma upsert.
         ordered_data = sorted(
             response.data,
             key=lambda item: item.index,

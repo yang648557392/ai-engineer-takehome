@@ -1,3 +1,5 @@
+"""Split normalized source documents into deterministic retrieval units."""
+
 import re
 from collections.abc import Iterable
 
@@ -15,7 +17,15 @@ def _split_oversized_text(
     max_chars: int,
     overlap: int,
 ) -> list[str]:
-    """Split large text near paragraph boundaries."""
+    """Split text into overlapping pieces near paragraph boundaries.
+
+    Text no longer than max_chars is returned as one piece. Longer text is
+    split at the last paragraph boundary in the latter half of each window when
+    possible. overlap repeats context between adjacent pieces.
+
+    Raises:
+        ValueError: If the size or overlap configuration is invalid.
+    """
 
     if max_chars <= 0:
         raise ValueError("max_chars must be positive")
@@ -58,11 +68,15 @@ def _split_oversized_text(
 
 
 def _email_messages(text: str) -> list[tuple[str, str]]:
-    """Split an email thread into individual messages."""
+    """Return (subject, message_text) pairs from one email thread."""
 
-    messages = [
-        part.strip() for part in EMAIL_SEPARATOR_PATTERN.split(text) if part.strip()
-    ]
+    messages: list[str] = []
+
+    for part in EMAIL_SEPARATOR_PATTERN.split(text):
+        cleaned_part = part.strip()
+
+        if cleaned_part:
+            messages.append(cleaned_part)
 
     results: list[tuple[str, str]] = []
 
@@ -83,8 +97,15 @@ def chunk_document(
     max_chars: int = DEFAULT_MAX_CHARS,
     overlap: int = DEFAULT_OVERLAP,
 ) -> list[DocumentChunk]:
-    """Convert one source document into retrievable chunks."""
+    """Convert one source document into ordered, retrievable chunks.
 
+    Email threads are first separated into messages. Other formats remain one
+    logical unit before oversized text splitting. Chunk IDs use the document ID
+    and zero-padded position, making repeated indexing deterministic.
+    """
+
+    # Each unit is (optional section label, text). For email the label is the
+    # message subject; for Markdown and CSV there is one unlabeled unit.
     if document.path.suffix.lower() == ".eml":
         units: list[tuple[str | None, str]] = _email_messages(document.content)
     else:
@@ -130,7 +151,11 @@ def chunk_documents(
     max_chars: int = DEFAULT_MAX_CHARS,
     overlap: int = DEFAULT_OVERLAP,
 ) -> list[DocumentChunk]:
-    """Chunk a collection of source documents."""
+    """Chunk all documents and reject duplicate Chroma record IDs.
+
+    documents accepts any iterable, while the result is materialized as a list
+    because indexing sends aligned IDs, texts, metadata, and vectors to Chroma.
+    """
 
     chunks: list[DocumentChunk] = []
 

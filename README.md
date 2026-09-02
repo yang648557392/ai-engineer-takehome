@@ -90,7 +90,11 @@ src/vantel_qa/
   openrouter.py               OpenRouter API client
   retriever.py                Vector retrieval
 tests/                        Offline unit tests
+docs/data-flow.md             Concrete data contracts and nested shapes
 ```
+
+For concrete examples of every object passed between modules, including the
+nested Chroma and YAML structures, see [docs/data-flow.md](docs/data-flow.md).
 
 Generated persistent data is stored in:
 

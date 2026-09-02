@@ -1,3 +1,5 @@
+"""Run deterministic golden-set evaluation and persist results in SQLite."""
+
 import json
 import re
 import sqlite3
@@ -20,7 +22,11 @@ PASS_THRESHOLD = 0.8
 
 @dataclass(frozen=True, slots=True)
 class EvalCase:
-    """One golden evaluation case."""
+    """One human-authored test specification loaded from cases.yaml.
+
+    required_patterns score facts, expected_citations define minimum citations,
+    and relevant_documents define retrieval ground truth.
+    """
 
     case_id: str
     question: str
@@ -33,7 +39,7 @@ class EvalCase:
 
 @dataclass(frozen=True, slots=True)
 class CaseResult:
-    """Scores and output for one evaluation case."""
+    """Generated output, component scores, and provenance for one case."""
 
     case_id: str
     question: str
@@ -53,7 +59,7 @@ class CaseResult:
 
 @dataclass(frozen=True, slots=True)
 class EvaluationSummary:
-    """Aggregate scores for one evaluation run."""
+    """Mean metrics and counts for one complete evaluation run."""
 
     run_id: str
     case_count: int
@@ -66,8 +72,18 @@ class EvaluationSummary:
 
 
 def load_cases(path: Path) -> list[EvalCase]:
-    """Load golden evaluation cases from YAML."""
+    """Convert a YAML cases mapping into named EvalCase objects.
 
+    The raw shape is a dictionary whose cases key contains a list of case
+    dictionaries. Conversion here prevents nested dictionaries from spreading
+    through the rest of the evaluator.
+
+    Raises:
+        TypeError: If the root is not a mapping or cases is not a list.
+    """
+
+    # PyYAML returns plain dict/list containers. Validate the outer shape before
+    # constructing typed dataclass objects.
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
 
     if not isinstance(raw, dict):
@@ -93,6 +109,8 @@ def load_cases(path: Path) -> list[EvalCase]:
 
 
 def _f1(precision: float, recall: float) -> float:
+    """Return the harmonic mean of precision and recall."""
+
     if precision + recall == 0:
         return 0.0
 
@@ -105,8 +123,13 @@ def score_case(
     retrieved_documents: list[str],
     error: str | None = None,
 ) -> CaseResult:
-    """Score correctness, citations, and retrieval for one answer."""
+    """Calculate independent answer, citation, and retrieval scores.
 
+    A case passes only when all three components reach PASS_THRESHOLD, so a
+    strong aggregate score cannot hide one weak component.
+    """
+
+    # Sets remove duplicate IDs and make overlap calculations explicit.
     cited = extract_citations(answer)
     expected = set(case.expected_citations)
     relevant = set(case.relevant_documents)
@@ -209,6 +232,8 @@ CREATE TABLE IF NOT EXISTS evaluation_results (
 
 
 def _open_database(path: Path) -> sqlite3.Connection:
+    """Open the evaluation database and create missing tables."""
+
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
     connection.executescript(SCHEMA)
@@ -221,6 +246,12 @@ def _save_result(
     run_id: str,
     result: CaseResult,
 ) -> None:
+    """Insert and commit one result immediately.
+
+    Immediate commits preserve earlier cases if a later API request fails.
+    Document ID tuples are JSON-encoded because SQLite has no tuple type.
+    """
+
     connection.execute(
         """
         INSERT INTO evaluation_results (
@@ -263,11 +294,18 @@ def _save_result(
 
 
 def _mean(values: list[float]) -> float:
+    """Return an arithmetic mean, using zero for an empty group."""
+
     return sum(values) / len(values) if values else 0.0
 
 
 def run_evaluation(settings: Settings) -> EvaluationSummary:
-    """Run all golden cases and persist every result."""
+    """Answer, score, and persist every configured golden case.
+
+    A run row starts with status running. Each case executes the full RAG
+    pipeline and is saved immediately. Per-case exceptions become failed rows
+    instead of aborting later cases. Aggregate metrics then complete the run.
+    """
 
     cases = load_cases(settings.evaluation_cases_path)
     run_id = uuid4().hex

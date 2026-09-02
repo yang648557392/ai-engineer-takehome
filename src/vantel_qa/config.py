@@ -1,3 +1,5 @@
+"""Central application configuration loaded from environment variables."""
+
 from functools import lru_cache
 from pathlib import Path
 
@@ -6,7 +8,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """Validated runtime settings.
+
+    Field names map to uppercase environment variables. For example,
+    openrouter_api_key is loaded from OPENROUTER_API_KEY. Values can come from
+    the process environment or the project .env file.
+
+    Paths are relative to the directory from which the CLI is run, normally the
+    repository root.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -27,6 +37,10 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Return one cached settings instance."""
+    """Load settings once per process and return the cached instance.
+
+    Caching avoids reparsing .env and guarantees that every pipeline stage sees
+    the same model names and storage paths during one command.
+    """
 
     return Settings()

@@ -1,3 +1,5 @@
+"""Typer CLI for indexing, retrieval, question answering, and evaluation."""
+
 import typer
 from rich.console import Console
 
@@ -15,12 +17,16 @@ console = Console()
 
 @app.callback()
 def root() -> None:
-    """Vantel QA command-line application."""
+    """Register the root command group.
+
+    It currently performs no setup, but provides a future location for global
+    options shared by index, search, ask, and evaluate.
+    """
 
 
 @app.command("index")
 def index_command() -> None:
-    """Build a fresh persistent ChromaDB index."""
+    """Rebuild Chroma from the corpus and print index statistics."""
 
     settings = get_settings()
     stats = build_index(settings, reset=True)
@@ -35,7 +41,7 @@ def index_command() -> None:
 
 @app.command("search")
 def search_command(question: str) -> None:
-    """Show the chunks most relevant to a question."""
+    """Display ranked chunks without asking the chat model for an answer."""
 
     settings = get_settings()
     results = search_index(settings, question)
@@ -49,7 +55,7 @@ def search_command(question: str) -> None:
 
 @app.command("ask")
 def ask_command(question: str) -> None:
-    """Answer a question using the indexed corpus."""
+    """Run retrieval plus generation and display answer provenance."""
 
     settings = get_settings()
     answer, retrieved = answer_question(settings, question)
@@ -66,7 +72,7 @@ def ask_command(question: str) -> None:
 
 @app.command("evaluate")
 def evaluate_command() -> None:
-    """Run the golden evaluation set and save results."""
+    """Run every YAML case and persist case and run metrics to SQLite."""
 
     settings = get_settings()
     summary = run_evaluation(settings)

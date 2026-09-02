@@ -1,3 +1,5 @@
+"""Build grounded prompts, generate answers, and validate citation IDs."""
+
 import re
 
 from vantel_qa.config import Settings
@@ -26,7 +28,11 @@ Rules:
 
 
 def build_context(chunks: list[RetrievedChunk]) -> str:
-    """Format retrieved chunks for the answer prompt."""
+    """Serialize retrieved evidence into the chat model context.
+
+    Each block begins with SOURCE [Dxxx], title, and optional date, followed by
+    chunk text. Blank lines keep source boundaries visible to the model.
+    """
 
     blocks: list[str] = []
 
@@ -42,7 +48,7 @@ def build_context(chunks: list[RetrievedChunk]) -> str:
 
 
 def extract_citations(answer: str) -> set[str]:
-    """Extract Dxxx IDs from individual or grouped citations."""
+    """Return unique Dxxx IDs found inside square-bracket citations."""
 
     citations: set[str] = set()
 
@@ -57,7 +63,16 @@ def answer_question(
     question: str,
     top_k: int = 8,
 ) -> tuple[str, list[RetrievedChunk]]:
-    """Retrieve evidence and answer one question."""
+    """Answer one question using only evidence retrieved from Chroma.
+
+    Returns:
+        A tuple of the final answer string and retrieved chunks. Returning both
+        lets the CLI display provenance and evaluation score retrieval recall.
+
+    Raises:
+        RuntimeError: If the provider returns no answer or the model cites a
+        document absent from its retrieved context.
+    """
 
     retrieved = search_index(
         settings=settings,
@@ -88,6 +103,8 @@ def answer_question(
         ],
     )
 
+    # The API returns candidate completions as a list. This request asks for one
+    # candidate, so choices[0] is the answer to validate.
     answer = response.choices[0].message.content
 
     if not answer:
@@ -96,6 +113,8 @@ def answer_question(
     answer = answer.strip()
     used_citations = extract_citations(answer)
     allowed_citations = {chunk.doc_id for chunk in retrieved}
+    # This validates provenance, not semantic support. A separate claim-level
+    # verifier would be needed to prove that a cited source supports a sentence.
     invalid_citations = used_citations - allowed_citations
 
     if invalid_citations:

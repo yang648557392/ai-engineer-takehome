@@ -1,3 +1,5 @@
+"""Load corpus files and normalize them into SourceDocument objects."""
+
 import re
 from pathlib import Path
 from typing import Any
@@ -17,7 +19,16 @@ DEFAULT_SOURCE_TYPES = {
 
 
 def _read_frontmatter(text: str) -> tuple[dict[str, Any], str]:
-    """Separate YAML frontmatter from a Markdown document."""
+    """Separate optional YAML frontmatter from a Markdown document.
+
+    Returns:
+        A (metadata, body) tuple. Metadata is an empty dictionary when no
+        frontmatter is present.
+
+    Raises:
+        ValueError: If an opening delimiter has no closing delimiter.
+        TypeError: If parsed YAML is not a key-value mapping.
+    """
 
     lines = text.splitlines(keepends=True)
 
@@ -48,12 +59,14 @@ def _read_frontmatter(text: str) -> tuple[dict[str, Any], str]:
 
 
 def _extract_filename_id(path: Path) -> str | None:
+    """Return the first Dxxx identifier found in a filename."""
+
     match = DOC_ID_PATTERN.search(path.name)
     return match.group(1) if match else None
 
 
 def _infer_title(path: Path, content: str) -> str:
-    """Infer a readable title when frontmatter does not provide one."""
+    """Infer a title from a Markdown heading, first line, or filename stem."""
 
     if path.suffix.lower() == ".md":
         heading = re.search(r"^#\s+(.+)$", content, flags=re.MULTILINE)
@@ -71,7 +84,18 @@ def _infer_title(path: Path, content: str) -> str:
 
 
 def load_document(path: Path) -> SourceDocument:
-    """Load one supported corpus file."""
+    """Read and normalize one Markdown, CSV, or email source file.
+
+    Markdown metadata takes precedence over filename inference. When both the
+    filename and frontmatter provide a document ID, they must agree so that a
+    source cannot be cited under the wrong ID.
+
+    Returns:
+        A SourceDocument containing normalized metadata and text.
+
+    Raises:
+        ValueError: If the format or document ID is invalid or inconsistent.
+    """
 
     suffix = path.suffix.lower()
 
@@ -127,7 +151,16 @@ def load_document(path: Path) -> SourceDocument:
 
 
 def load_documents(data_dir: Path) -> list[SourceDocument]:
-    """Load every supported document in deterministic order."""
+    """Load every supported file in stable filename order.
+
+    Returns:
+        One SourceDocument per supported file. Stable ordering makes chunk IDs
+        and tests deterministic.
+
+    Raises:
+        FileNotFoundError: If data_dir is not a directory.
+        ValueError: If two files resolve to the same document ID.
+    """
 
     if not data_dir.is_dir():
         raise FileNotFoundError(f"Data directory does not exist: {data_dir}")
