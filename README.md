@@ -13,22 +13,22 @@ You need Python 3.12, uv, and an OpenRouter API key.
 
 Copy the example environment file:
 
-~~~bash
+```bash
 cp .env.example .env
-~~~
+```
 
 Add the provided key to .env:
 
-~~~dotenv
+```dotenv
 OPENROUTER_API_KEY=your-key
-~~~
+```
 
 Install the project and build the index:
 
-~~~bash
+```bash
 uv sync
 PYTHONPATH=src uv run vantel-qa index
-~~~
+```
 
 The finished index has 32 documents, 38 chunks, and 1,536 values in each
 embedding vector.
@@ -37,28 +37,28 @@ embedding vector.
 
 Search for relevant text without asking the chat model:
 
-~~~bash
+```bash
 PYTHONPATH=src uv run vantel-qa search "What was Kettlebridge ARR at the end of Q2 2027?"
-~~~
+```
 
 Generate an answer:
 
-~~~bash
+```bash
 PYTHONPATH=src uv run vantel-qa ask "What was Kettlebridge ARR at the end of Q2 2027?"
-~~~
+```
 
 Run all 10 evaluation cases:
 
-~~~bash
+```bash
 PYTHONPATH=src uv run vantel-qa evaluate
-~~~
+```
 
 Run tests and code checks:
 
-~~~bash
+```bash
 uv run pytest -v
 uv run ruff check .
-~~~
+```
 
 ## How It Works
 
@@ -127,14 +127,14 @@ recall. A case passes only if every main score is at least 0.8.
 
 The recorded final run produced:
 
-| Metric | Result |
-| --- | ---: |
-| Passed | 9/10 |
-| Correctness | 0.975 |
-| Citation F1 | 1.000 |
-| Retrieval recall@8 | 1.000 |
-| Refusal pass rate | 1.000 |
-| Aggregate score | 0.988 |
+| Metric             | Result |
+| ------------------ | -----: |
+| Passed             |   9/10 |
+| Correctness        |  0.975 |
+| Citation F1        |  1.000 |
+| Retrieval recall@8 |  1.000 |
+| Refusal pass rate  |  1.000 |
+| Aggregate score    |  0.988 |
 
 Case q07 failed because the answer used a March vector count as if it were
 current. The number was close, but the answer missed the time warning.
@@ -178,6 +178,37 @@ The next step would be stronger citation checking and a small internal pilot.
 Vantel's own standard requires at least 30 cases written by domain experts.
 This submission has only 10. It is enough for a take-home test, but not for a
 production release.
+
+## Technical Choices
+
+### Embedding Model
+
+I used `openai/text-embedding-3-small`.
+
+This model is covered by the provided zero data retention agreement. It is also low cost and works well for this small document set. Each embedding has 1,536 values.
+
+### Framework
+
+I did not use LangChain, LangGraph, or Mastra. I used the OpenAI SDK directly with OpenRouter.
+
+This project has a simple flow: load documents, create embeddings, search Chroma, and ask the chat model. A large framework was not needed. Direct SDK calls also make the code easier to read, test, and explain.
+
+### Evaluation
+
+I built a custom evaluation instead of using Ragas or DeepEval.
+
+The evaluation measures:
+
+- **Correctness:** the percentage of required answer patterns found in the answer.
+- **Citation precision:** how many cited document IDs are allowed.
+- **Citation recall:** how many expected document IDs are cited.
+- **Citation F1:** the balance between citation precision and recall.
+- **Retrieval recall@8:** how many relevant documents appear in the top eight results.
+- **Refusal pass rate:** whether the system refuses questions that the documents cannot answer.
+
+The aggregate score uses 50% correctness, 30% citation F1, and 20% retrieval recall.
+
+This method is simple and repeatable, but it has limits. Regular expressions do not fully understand meaning. Citation scoring checks document IDs, but it does not prove that a document supports every claim.
 
 ## Recommendation Memo
 
